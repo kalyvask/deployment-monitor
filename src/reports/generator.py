@@ -23,6 +23,21 @@ from ..database import (
     get_opportunity_stats,
     get_company_intel,
 )
+from ..processors.relevance import apply_freshness, cluster_duplicate_articles
+
+# Appended verbatim to every Claude prompt that synthesizes article content.
+# Prevents fabricated valuations / customer counts / quotes from leaking into reports.
+SOURCING_RULES = """
+SOURCING RULES (strict):
+- Only cite companies, dollar amounts, percentages, customer counts, or direct
+  quotes that appear in the article excerpts above. If a specific number isn't
+  in the source material, omit it — do not estimate, infer, or round.
+- If you reference a fact, the company or product it relates to must also appear
+  in the source material. No inventing connecting tissue.
+- If the corpus is thin, say so plainly ("evidence this week is limited to X")
+  rather than padding with generic industry commentary.
+- No hedged speculation phrased as fact ("likely", "appears to", "is positioning to").
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +239,8 @@ in AI do based on this? Be specific about timing, positioning, and competitive d
 **Conviction Level:** High/Medium/Low — how confident should the reader be in acting on this signal?
 
 Write approximately 800-1000 words total across all 5 deep dives.
-Be bold in your analysis — don't hedge everything. Take clear positions on what matters."""
+Be bold in your analysis — don't hedge everything. Take clear positions on what matters.
+""" + SOURCING_RULES
 
         return self._call_claude(prompt, system, 3000)
 
@@ -321,7 +337,8 @@ Brief analysis of who is winning and losing across the AI stack:
 1-2 views that go against the prevailing narrative. What is the market
 getting wrong about AI deployment?
 
-Be bold, specific, and actionable throughout."""
+Be bold, specific, and actionable throughout.
+""" + SOURCING_RULES
 
         return self._call_claude(prompt, system, 3000)
 
@@ -389,8 +406,10 @@ Write a dense, insight-packed executive summary that:
 Rules:
 - No generic statements like "AI continues to evolve"
 - Every sentence must contain a specific fact, company name, or data point
+  drawn from the article summaries above
 - Use strong verbs: "signals", "accelerates", "threatens", "validates"
-- Write in present tense for urgency"""
+- Write in present tense for urgency
+""" + SOURCING_RULES
 
         return self._call_claude(prompt, system, 1500)
 
@@ -417,12 +436,25 @@ Rules:
         if not articles:
             return "# Executive Briefing\n\nNo relevant articles found for this period.\n"
 
+        # Re-rank by relevance × freshness so newer items lead the briefing.
+        articles = apply_freshness(articles)
+        # Collapse the same story republished by multiple outlets into one entry,
+        # with the others attached as `also_covered`.
+        raw_count = len(articles)
+        articles = cluster_duplicate_articles(articles)
+        if raw_count != len(articles):
+            logger.info(f"Dedup: {raw_count} articles -> {len(articles)} clusters")
+
         insights = get_recent_insights(limit=30)
         stats = get_database_stats()
         categorized = self._categorize_articles(articles)
         mentioned_companies = self._get_mentioned_companies(articles)
         trend_counts = self._analyze_trend_coverage(articles)
-        top_articles = sorted(articles, key=lambda x: x.get("relevance_score", 0), reverse=True)
+        top_articles = sorted(
+            articles,
+            key=lambda x: x.get("effective_score", x.get("relevance_score", 0)),
+            reverse=True,
+        )
 
         total_relevant = len([a for a in articles if a.get("relevance_score", 0) >= 0.6])
 
@@ -587,6 +619,10 @@ Rules:
             report.append(f"*{source} | Relevance: {score:.2f}*")
             if summary:
                 report.append(f"{summary}")
+            also = article.get("also_covered") or []
+            if also:
+                names = ", ".join(sorted({m.get("source_name", "?") for m in also}))[:200]
+                report.append(f"*Also covered by: {names}*")
             report.append("")
 
         # Footer
@@ -619,7 +655,12 @@ Rules:
         if not articles:
             return "# Daily Digest\n\nNo new relevant articles in the past 24 hours.\n"
 
-        top_articles = sorted(articles, key=lambda x: x.get("relevance_score", 0), reverse=True)
+        articles = apply_freshness(articles)
+        top_articles = sorted(
+            articles,
+            key=lambda x: x.get("effective_score", x.get("relevance_score", 0)),
+            reverse=True,
+        )
 
         report = []
         report.append(f"# AI Deployment Monitor — Daily Digest")
@@ -647,7 +688,8 @@ Structure:
 2. **Also Notable** (3-4 bullet points): Other significant items, each with a "so what"
 3. **Quick Take**: One sentence on what today's coverage tells us about the market direction
 
-Be specific, name companies, skip the filler."""
+Be specific, name companies, skip the filler.
+""" + SOURCING_RULES
 
             daily_summary = self._call_claude(
                 daily_prompt,

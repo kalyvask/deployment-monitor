@@ -328,27 +328,29 @@ def get_articles_for_report(
     """Get articles for report generation."""
     with db_connection() as conn:
         cursor = conn.cursor()
+        # Filter on published_date when available, falling back to discovered_date.
+        # This keeps RSS re-discoveries of old posts out of "this week's" reports.
         if include_unprocessed:
-            # Include all articles regardless of processing status
             cursor.execute("""
                 SELECT a.*, s.name as source_name, s.type as source_type
                 FROM articles a
                 JOIN sources s ON a.source_id = s.id
                 WHERE a.relevance_score >= ?
-                  AND a.discovered_date >= ?
-                ORDER BY a.relevance_score DESC, a.discovered_date DESC
+                  AND COALESCE(a.published_date, a.discovered_date) >= ?
+                ORDER BY a.relevance_score DESC,
+                         COALESCE(a.published_date, a.discovered_date) DESC
                 LIMIT ?
             """, (min_relevance, since, limit))
         else:
-            # Only processed articles
             cursor.execute("""
                 SELECT a.*, s.name as source_name, s.type as source_type
                 FROM articles a
                 JOIN sources s ON a.source_id = s.id
                 WHERE a.is_processed = TRUE
                   AND a.relevance_score >= ?
-                  AND a.discovered_date >= ?
-                ORDER BY a.relevance_score DESC, a.discovered_date DESC
+                  AND COALESCE(a.published_date, a.discovered_date) >= ?
+                ORDER BY a.relevance_score DESC,
+                         COALESCE(a.published_date, a.discovered_date) DESC
                 LIMIT ?
             """, (min_relevance, since, limit))
         return [dict(row) for row in cursor.fetchall()]

@@ -9,7 +9,10 @@ implementation models, and enterprise AI adoption.
 import sys
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+
+import os
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
 import click
 from rich.console import Console
@@ -19,7 +22,7 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 
 # Import our modules
-from src.config import DATABASE_PATH, RELEVANCE_THRESHOLD
+from src.config import DATABASE_PATH, RELEVANCE_THRESHOLD, MAX_ARTICLE_AGE_DAYS
 from src.database import (
     init_database,
     seed_sources,
@@ -38,7 +41,12 @@ from src.reports import ReportGenerator
 from src.emailer import send_newsletter
 from src.utils import setup_logging
 
-console = Console()
+import sys as _sys
+# Force Rich to use non-legacy renderer on Windows to avoid cp1252 encoding errors
+if _sys.platform == "win32":
+    _sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    _sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+console = Console(force_terminal=True)
 logger = logging.getLogger(__name__)
 
 
@@ -57,11 +65,11 @@ def init():
 
     with console.status("Creating database..."):
         init_database()
-        console.print(f"[green]✓[/] Database created at {DATABASE_PATH}")
+        console.print(f"[green]OK[/] Database created at {DATABASE_PATH}")
 
     with console.status("Seeding sources..."):
         seed_sources()
-        console.print("[green]✓[/] Sources seeded")
+        console.print("[green]OK[/] Sources seeded")
 
     stats = get_database_stats()
     console.print(
@@ -116,7 +124,16 @@ def scrape(source, limit):
                 new_count = 0
                 relevant_count = 0
 
+                cutoff = datetime.utcnow() - timedelta(days=MAX_ARTICLE_AGE_DAYS)
+                stale_skipped = 0
                 for item in items:
+                    # Drop items older than MAX_ARTICLE_AGE_DAYS at ingestion.
+                    # Items with no published_date pass through (HN/Reddit may lack it).
+                    pub = item.get("published_date")
+                    if isinstance(pub, datetime) and pub < cutoff:
+                        stale_skipped += 1
+                        continue
+
                     # Score relevance
                     relevance = scorer.score(
                         item.get("title", ""),
@@ -157,12 +174,15 @@ def scrape(source, limit):
 
                 progress.update(
                     task,
-                    description=f"[green]✓[/] {new_count} new, {relevant_count} relevant",
+                    description=(
+                        f"[green]OK[/] {new_count} new, {relevant_count} relevant"
+                        + (f", {stale_skipped} stale skipped" if stale_skipped else "")
+                    ),
                 )
                 total_new += new_count
 
             except Exception as e:
-                progress.update(task, description=f"[red]✗[/] Error: {e}")
+                progress.update(task, description=f"[red]FAIL[/] Error: {e}")
                 logger.exception(f"Error scraping {source_type}")
 
     console.print(f"\n[bold green]Done![/] Added {total_new} new articles.")
@@ -267,7 +287,7 @@ def report(report_type, output, print_report):
         console.print(Markdown(content))
     else:
         filepath = generator.save_report(content, report_type, output)
-        console.print(f"[green]✓[/] Report saved to: {filepath}")
+        console.print(f"[green]OK[/] Report saved to: {filepath}")
 
 
 @cli.command()
@@ -342,16 +362,16 @@ def stats():
 [bold cyan]Database Statistics[/]
 
 📊 [bold]Content:[/]
-   • Total articles: {stats['total_articles']}
-   • Processed: {stats['processed_articles']}
-   • High relevance: {stats['relevant_articles']}
-   • Insights extracted: {stats['total_insights']}
+   - Total articles: {stats['total_articles']}
+   - Processed: {stats['processed_articles']}
+   - High relevance: {stats['relevant_articles']}
+   - Insights extracted: {stats['total_insights']}
 
 📰 [bold]Sources:[/]
-   • Active sources: {stats['active_sources']}
+   - Active sources: {stats['active_sources']}
 
 📝 [bold]Reports:[/]
-   • Generated: {stats['total_reports']}
+   - Generated: {stats['total_reports']}
 """
 
     console.print(Panel(panel_content, title="AI Deployment Monitor"))
@@ -430,9 +450,9 @@ def run_pipeline(send_email: bool = False, report_type: str = "daily"):
         generator.save_report(content, report_type)
         success = send_newsletter(content, report_type)
         if success:
-            console.print("[green]✓ Newsletter sent.[/]")
+            console.print("[green]OK Newsletter sent.[/]")
         else:
-            console.print("[red]✗ Newsletter send failed.[/]")
+            console.print("[red]FAIL Newsletter send failed.[/]")
 
     console.print("[green]Pipeline complete.[/]")
 
@@ -485,7 +505,7 @@ def export(fmt, output, limit):
         with open(output, "w", encoding="utf-8") as f:
             json.dump(articles, f, indent=2, default=str)
 
-    console.print(f"[green]✓[/] Exported {len(articles)} articles to {output}")
+    console.print(f"[green]OK[/] Exported {len(articles)} articles to {output}")
 
 
 @cli.command()
@@ -532,7 +552,7 @@ def newsletter(report_type, recipient, dry_run):
 
     # Save report to file
     filepath = generator.save_report(content, report_type)
-    console.print(f"[green]✓[/] Report saved to: {filepath}")
+    console.print(f"[green]OK[/] Report saved to: {filepath}")
 
     # Step 4: Send email
     if dry_run:
@@ -545,9 +565,9 @@ def newsletter(report_type, recipient, dry_run):
     success = send_newsletter(content, report_type, recipient)
 
     if success:
-        console.print("[bold green]✓ Newsletter sent successfully![/]")
+        console.print("[bold green]OK Newsletter sent successfully![/]")
     else:
-        console.print("[bold red]✗ Failed to send newsletter. Check SMTP settings in .env[/]")
+        console.print("[bold red]FAIL Failed to send newsletter. Check SMTP settings in .env[/]")
 
 
 @cli.command()
@@ -555,7 +575,7 @@ def run():
     """Run the full pipeline: scrape, analyze, and report."""
     console.print(Panel(
         "[bold]AI Deployment Research Monitor[/]\n\n"
-        "Running full pipeline: scrape → analyze → report",
+        "Running full pipeline: scrape -> analyze -> report",
         title="Starting",
     ))
 

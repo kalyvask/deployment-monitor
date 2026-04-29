@@ -53,6 +53,13 @@ REQUEST_DELAY = 0.1 if VERCEL else 1.0  # Faster on Vercel, polite locally
 # Relevance threshold
 RELEVANCE_THRESHOLD = 0.6
 
+# Recency controls
+# Reject articles whose published_date is older than this at ingestion time.
+MAX_ARTICLE_AGE_DAYS = 14
+# Half-life used when applying freshness decay to relevance scores at report time.
+# An article 7 days old is worth half a fresh one; 14 days old is worth a quarter.
+FRESHNESS_HALF_LIFE_DAYS = 7
+
 # =============================================================================
 # LATEST AI TRENDS & KEYWORDS (2025)
 # =============================================================================
@@ -262,6 +269,60 @@ SECONDARY_KEYWORDS = [
     "otel",
 ]
 
+# =============================================================================
+# COMPANY TIERS — weighted by signal value
+# Tier A: rare mentions, high signal (vertical AI startups, FDE-heavy companies)
+# Tier B: common mentions, medium signal (model labs, big platforms)
+# Tier C: ubiquitous mentions, low signal (hyperscalers, chip makers)
+# =============================================================================
+COMPANY_TIER_A = [
+    # Vertical / applied AI — a mention is informative
+    "harvey", "sierra", "glean", "decagon", "cresta", "hebbia", "writer",
+    "cognition", "devin", "factory.ai", "magic.dev", "lovable", "bolt.new",
+    "world labs", "physical intelligence", "/dev/agents",
+    # Coding agents at scale
+    "cursor", "codeium", "windsurf", "replit", "tabnine", "sourcegraph",
+    # AI observability / eval (research focus)
+    "langsmith", "langfuse", "braintrust", "humanloop", "patronus ai",
+    "log10", "helicone", "portkey", "openllmetry", "traceloop",
+    "phoenix arize", "opik", "confident ai", "deepchecks", "arthur ai",
+    "fiddler ai", "aporia", "superwise",
+    # Defense / niche
+    "anduril", "shield ai", "rebellion defense", "palantir",
+    # AI security
+    "lasso security", "robust intelligence", "protect ai",
+    "hidden layer", "calypso ai",
+]
+
+COMPANY_TIER_B = [
+    # Model labs
+    "anthropic", "openai", "google deepmind", "deepmind", "mistral",
+    "cohere", "ai21", "inflection", "xai", "deepseek",
+    # Data + AI platforms
+    "databricks", "snowflake", "motherduck", "duckdb", "clickhouse",
+    "starburst", "trino", "confluent",
+    # GPU / inference platforms
+    "scale ai", "anyscale", "modal", "replicate", "together ai",
+    "fireworks ai", "groq", "cerebras",
+    # Vector DBs
+    "pinecone", "weaviate", "qdrant", "chroma", "milvus",
+    # Enterprise AI
+    "c3 ai", "datarobot", "h2o.ai", "weights & biases", "wandb",
+    "neptune", "mlflow", "perplexity", "jasper", "copy.ai", "notion ai",
+    # Agent frameworks
+    "adept", "langchain", "llamaindex", "autogpt", "crewai",
+    # Observability infra (broader)
+    "arize", "whylabs", "galileo ai",
+]
+
+COMPANY_TIER_C = [
+    # Hyperscalers + chip makers — almost everyone mentions these
+    "nvidia", "amd", "intel", "google tpu", "aws trainium", "inferentia",
+    "aws bedrock", "azure openai", "google vertex", "vertex ai",
+    "meta ai", "evidently ai", "opentelemetry",
+]
+
+# Flat companion list — preserved for backward compat (relevance scorer + report code).
 # Companies to always flag - Updated for 2025
 TARGET_COMPANIES = [
     # AI Labs & Model Providers
@@ -280,6 +341,12 @@ TARGET_COMPANIES = [
     # AI Infrastructure & Platforms
     "databricks",
     "snowflake",
+    "motherduck",
+    "duckdb",
+    "clickhouse",
+    "starburst",
+    "trino",
+    "confluent",
     "scale ai",
     "anyscale",
     "modal",
@@ -383,6 +450,44 @@ TARGET_COMPANIES = [
 # =============================================================================
 # OPPORTUNITY SIGNAL KEYWORDS (flag business opportunity indicators)
 # =============================================================================
+# =============================================================================
+# REGEX-BASED OPPORTUNITY SIGNALS
+# These require a numeric amount or quantifier — much lower false-positive rate
+# than substring matches like "raised $" (which matches "raised $5 to fix it").
+# Each pattern carries a label used for downstream classification.
+# =============================================================================
+OPPORTUNITY_REGEX_PATTERNS = [
+    # Funding rounds with amounts: "raised $50M", "$1.2 billion Series C"
+    (r"\braised\s+\$\s?\d+(?:\.\d+)?\s*(?:m|mm|b|bn|million|billion)\b", "funding_amount"),
+    (r"\$\s?\d+(?:\.\d+)?\s*(?:m|mm|b|bn|million|billion)\s+(?:series\s+[a-e]|seed|pre-seed)\b", "funding_amount"),
+    (r"\bseries\s+[a-e]\b.{0,40}?\$\s?\d+(?:\.\d+)?\s*(?:m|mm|b|bn|million|billion)\b", "funding_amount"),
+
+    # Valuations with amounts
+    (r"\bvalu(?:ed|ation)\s+(?:at\s+)?\$\s?\d+(?:\.\d+)?\s*(?:m|mm|b|bn|million|billion)\b", "valuation"),
+    (r"\$\s?\d+(?:\.\d+)?\s*(?:b|bn|billion)\s+valuation\b", "valuation"),
+
+    # Customer counts: "200+ customers", "deployed at 50 enterprises"
+    (r"\b\d{2,}\+?\s+(?:customers|enterprises|companies|fortune\s+\d+\s+companies)\b", "customer_count"),
+    (r"\b(?:deployed|adopted|used|implemented)\s+(?:by|at)\s+\d{2,}\+?\s+(?:companies|customers|enterprises)\b", "customer_count"),
+
+    # Revenue / ARR
+    (r"\$\s?\d+(?:\.\d+)?\s*(?:m|mm|b|bn|million|billion)\s+(?:in\s+)?(?:arr|annual\s+recurring|revenue)\b", "revenue"),
+    (r"\b(?:arr|annual\s+recurring\s+revenue)\s+of\s+\$\s?\d+(?:\.\d+)?\s*(?:m|mm|b|bn|million|billion)\b", "revenue"),
+
+    # Quantified business impact
+    (r"\b(?:reduced|cut|saved)\s+(?:costs?|expenses?)\s+by\s+\d+\s*%", "cost_savings"),
+    (r"\bsaved\s+\d+\+?\s+(?:hours|days|weeks|engineers)\b", "time_savings"),
+    (r"\b\d+x\s+(?:faster|productivity|throughput|efficiency)\b", "productivity_gain"),
+
+    # Acquisitions with amounts
+    (r"\bacquir(?:ed|es|ing)\b.{0,40}?\$\s?\d+(?:\.\d+)?\s*(?:m|mm|b|bn|million|billion)\b", "acquisition"),
+
+    # Deployment-stage transitions (non-numeric but specific)
+    (r"\b(?:general\s+availability|generally\s+available|now\s+ga)\b", "deployment_milestone"),
+    (r"\bmoving\s+(?:from\s+)?pilot\s+to\s+production\b", "deployment_milestone"),
+    (r"\brolled\s+out\s+to\s+\d+\+?\s+(?:teams|users|employees|customers)\b", "deployment_milestone"),
+]
+
 OPPORTUNITY_KEYWORDS = [
     # Deployment maturity signals
     "pilot program", "general availability", "rolled out to", "production deployment",
@@ -495,9 +600,12 @@ REDDIT_SUBREDDITS = [
     "ArtificialIntelligence",   # AI industry news
 ]
 
-# RSS feeds to monitor - Updated and expanded (verified working 2025)
+# RSS feeds to monitor.
+# All URLs verified working as of 2026-04-25. Dropped feeds without public RSS:
+# Anthropic news, a16z, First Round Review, Shopify Eng, Notion, Uber Eng,
+# Google SRE, WhyLabs (shutting down), Evidently AI, Starburst.
 RSS_FEEDS = {
-    # News & Tech Publications (all verified working)
+    # News & Tech Publications
     "techcrunch_ai": "https://techcrunch.com/category/artificial-intelligence/feed/",
     "venturebeat_ai": "https://venturebeat.com/category/ai/feed/",
     "mit_tech_review": "https://www.technologyreview.com/feed/",
@@ -508,12 +616,13 @@ RSS_FEEDS = {
     # VC & Startup Blogs
     "sequoia": "https://www.sequoiacap.com/feed/",
 
-    # AI Lab Blogs (only verified working ones)
+    # AI Lab Blogs
     "deepmind_blog": "https://deepmind.google/blog/rss.xml",
+    "openai_news": "https://openai.com/news/rss.xml",
 
     # Company Engineering Blogs
     "huggingface_blog": "https://huggingface.co/blog/feed.xml",
-    "langchain_blog": "https://blog.langchain.dev/rss/",
+    "langchain_blog": "https://www.langchain.com/blog/rss.xml",
 
     # AI Research
     "arxiv_cs_ai": "https://rss.arxiv.org/rss/cs.AI",
@@ -522,31 +631,40 @@ RSS_FEEDS = {
     # Additional AI News Sources
     "import_ai": "https://jack-clark.net/feed/",
 
-    # Business Intelligence & Funding Sources
-    "a16z_blog": "https://a16z.com/feed/",
-    "first_round_review": "https://review.firstround.com/feed.xml",
-
     # Engineering Blogs (deployment case studies)
     "stripe_blog": "https://stripe.com/blog/feed.rss",
-    "shopify_eng": "https://shopify.engineering/blog/feed.atom",
-    "notion_blog": "https://www.notion.so/blog/rss",
-    "uber_eng": "https://www.uber.com/blog/rss/",
-    "netflix_tech": "https://netflixtechblog.com/feed",
+    "netflix_tech": "https://medium.com/feed/netflix-techblog",
     "airbnb_eng": "https://medium.com/feed/airbnb-engineering",
 
     # AI Industry Analysis
-    "the_information": "https://www.theinformation.com/feed",
+    # (The Information dropped — feed is 403 even with browser UA)
     "semianalysis": "https://semianalysis.com/feed",
+    "stratechery": "https://stratechery.com/feed/",
 
     # AI Observability & Monitoring (research focus)
-    "arize_blog": "https://arize.com/blog/feed/",
+    # (Arize dropped — Cloudflare 403s any non-browser request)
     "langchain_changelog": "https://changelog.langchain.com/feed",
-    "evidently_blog": "https://www.evidentlyai.com/blog/feed",
-    "whylabs_blog": "https://whylabs.ai/blog/feed",
-    "helicone_blog": "https://www.helicone.ai/blog/rss.xml",
+    "helicone_blog": "https://blog.helicone.ai/feed",
 
-    # SRE & DevOps
-    "google_sre": "https://sre.google/feed.xml",
+    # Coding/agent product cadence
+    "cursor_changelog": "https://www.cursor.com/changelog/rss.xml",
+    "vercel_atom": "https://vercel.com/atom",
+
+    # Hyperscaler AI announcements (GA / customer wins)
+    "aws_whatsnew": "https://aws.amazon.com/about-aws/whats-new/recent/feed/",
+    "gcp_ai_blog": "https://cloudblog.withgoogle.com/products/ai-machine-learning/rss/",
+
+    # Curated AI deal-flow / practitioner aggregators
+    "latent_space": "https://www.latent.space/feed",
+    "tldr_ai": "https://tldr.tech/api/rss/ai",
+    "bens_bites": "https://bensbites.com/feed.xml",
+    "crunchbase_ai": "https://news.crunchbase.com/sections/ai/feed/",
+
+    # Data + AI platforms (Snowflake, Databricks, and lakehouse/warehouse competitors)
+    # (MotherDuck and ClickHouse dropped — neither publishes a working RSS feed)
+    "snowflake_blog": "https://www.snowflake.com/feed/",
+    "databricks_blog": "https://www.databricks.com/blog/feed.xml",
+    "confluent_blog": "https://www.confluent.io/feed/",
 }
 
 # Hacker News settings

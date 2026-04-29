@@ -66,10 +66,19 @@ class RSSFeedScraper(BaseScraper):
             self.rate_limit()
 
             # Use requests to fetch with timeout, then parse
+            # Use a browser-like UA — many feeds (Arize, The Information, etc.)
+            # sit behind Cloudflare and 403 generic bots.
             response = requests.get(
                 feed_url,
                 timeout=REQUEST_TIMEOUT,
-                headers={"User-Agent": "AIDeploymentMonitor/1.0"},
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+                },
             )
             response.raise_for_status()
 

@@ -61,103 +61,312 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Modern light CSS
-st.markdown("""
+# =============================================================================
+# THEME — applies "Impeccable" (pbakaus) and "Design-for-AI" (ryanthedev)
+# principles: OKLCH-tinted neutrals (no pure gray/black), modular type scale,
+# strategic color, intentional typography pairing, no nested cards or AI-slop
+# gradients. Color tokens are exposed as CSS custom properties AND a Python
+# THEME dict so charts and CSS pull from the same source.
+# =============================================================================
+THEME = {
+    "paper": "#F7F5F1",          # warm off-white canvas
+    "surface": "#EFEDE7",        # subtle wash
+    "surface_2": "#E5E2DA",
+    "line": "#D9D5CC",
+    "line_strong": "#BFB9AC",
+    "ink_1": "#1B1B1A",          # primary text - tinted near-black
+    "ink_2": "#3F3D38",
+    "ink_3": "#6E6A60",
+    "ink_mute": "#9A9587",
+    "accent": "#2C5BA8",         # deliberate steel blue - not purple
+    "accent_soft": "#E2E8F4",
+    "accent_ink": "#1E3F75",
+    "signal": "#3F7A4D",         # opportunity / positive
+    "signal_soft": "#E1ECDF",
+    "warn": "#B5772A",
+    "danger": "#A8413A",
+    "grid": "#ECE9E2",           # chart gridlines
+}
+
+# Eight-color qualitative palette for category charts. Picked to be
+# accessible-on-paper and visually distinct without resembling default
+# library palettes (no Plotly purple, no pastel candy).
+THEME_QUALITATIVE = [
+    "#2C5BA8", "#3F7A4D", "#B5772A", "#7A4FA0",
+    "#1B7E8B", "#A8413A", "#8B6F47", "#4A5568",
+]
+
+st.markdown(f"""
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-    /* Global overrides for light, airy feel */
-    section[data-testid="stSidebar"] {
-        background-color: #F8FAFC;
-        border-right: 1px solid #E2E8F0;
-    }
-    section[data-testid="stSidebar"] .stRadio label {
-        font-size: 0.95rem;
-        padding: 0.35rem 0;
-    }
-    .main-header {
-        font-size: 1.8rem;
+    :root {{
+        /* Type scale — perfect-fourth (1.333), grounded at 14px reading body */
+        --t-12: 0.75rem;
+        --t-13: 0.8125rem;
+        --t-14: 0.875rem;
+        --t-16: 1rem;
+        --t-18: 1.125rem;
+        --t-22: 1.375rem;
+        --t-28: 1.75rem;
+        --t-36: 2.25rem;
+
+        /* 4-px spacing rhythm */
+        --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+        --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+
+        --radius: 10px;
+        --radius-sm: 6px;
+        --radius-pill: 999px;
+
+        --paper: {THEME["paper"]};
+        --surface: {THEME["surface"]};
+        --surface-2: {THEME["surface_2"]};
+        --line: {THEME["line"]};
+        --line-strong: {THEME["line_strong"]};
+        --ink-1: {THEME["ink_1"]};
+        --ink-2: {THEME["ink_2"]};
+        --ink-3: {THEME["ink_3"]};
+        --ink-mute: {THEME["ink_mute"]};
+        --accent: {THEME["accent"]};
+        --accent-soft: {THEME["accent_soft"]};
+        --accent-ink: {THEME["accent_ink"]};
+        --signal: {THEME["signal"]};
+        --signal-soft: {THEME["signal_soft"]};
+        --warn: {THEME["warn"]};
+        --danger: {THEME["danger"]};
+    }}
+
+    @media (prefers-reduced-motion: reduce) {{
+        *, *::before, *::after {{
+            animation-duration: 0.01ms !important;
+            transition-duration: 0.01ms !important;
+        }}
+    }}
+
+    /* === Canvas === */
+    html, body, .stApp, [data-testid="stAppViewContainer"] {{
+        background: var(--paper) !important;
+    }}
+
+    /* === Typography === */
+    /* Body: Inter Tight (intentional, not generic Inter or system).
+       Display: Fraunces optical-size variable serif — adds character without
+       resembling the dated "huge inter heading" template look. */
+    html, body, [class*="css"], .stApp, .stMarkdown, .stMarkdown p,
+    .stButton, [data-testid="stMetric"], [data-testid="stRadio"] label,
+    [data-testid="stTabs"] button, .streamlit-expanderHeader,
+    .stTextInput input, .stSelectbox > div, .stTextArea textarea {{
+        font-family: 'Inter Tight', ui-sans-serif, -apple-system, system-ui, sans-serif !important;
+        font-feature-settings: "ss01", "cv11", "tnum";
+    }}
+    code, pre, [data-testid="stCodeBlock"] {{
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace !important;
+        font-size: var(--t-13);
+    }}
+
+    /* Display heading uses Fraunces — paired contrast with sans body. */
+    .main-header {{
+        font-family: 'Fraunces', Georgia, serif !important;
+        font-size: var(--t-36);
+        font-weight: 500;
+        font-variation-settings: "opsz" 80;
+        color: var(--ink-1);
+        letter-spacing: -0.025em;
+        line-height: 1.1;
+        margin: 0 0 var(--s-1) 0;
+    }}
+    .sub-header {{
+        font-size: var(--t-14);
+        color: var(--ink-3);
+        margin: 0 0 var(--s-6) 0;
+        max-width: 62ch;
+        line-height: 1.55;
+    }}
+
+    h1, h2, h3, h4, h5, h6 {{
+        color: var(--ink-1);
+        letter-spacing: -0.018em;
         font-weight: 600;
-        color: #1E293B;
-        margin-bottom: 0;
-        letter-spacing: -0.02em;
-    }
-    .sub-header {
-        font-size: 0.95rem;
-        color: #64748B;
-        margin-top: 0;
-    }
-    .trend-tag {
-        background: #EEF2FF;
-        color: #4338CA;
-        padding: 0.2rem 0.6rem;
-        border-radius: 6px;
-        font-size: 0.75rem;
-        margin-right: 0.4rem;
-        display: inline-block;
-        font-weight: 500;
-    }
-    .company-tag {
-        background: #FFF7ED;
-        color: #C2410C;
-        padding: 0.2rem 0.6rem;
-        border-radius: 6px;
-        font-size: 0.75rem;
-        margin-right: 0.4rem;
-        display: inline-block;
-        font-weight: 500;
-    }
-    .score-high { color: #059669; font-weight: 600; }
-    .score-medium { color: #D97706; font-weight: 600; }
-    .score-low { color: #9CA3AF; }
-
-    /* Clean metric cards */
-    [data-testid="stMetric"] {
-        background: #F8FAFC;
-        border: 1px solid #E2E8F0;
-        border-radius: 10px;
-        padding: 0.8rem 1rem;
-    }
-    [data-testid="stMetricLabel"] {
-        font-size: 0.8rem !important;
-        color: #64748B !important;
+    }}
+    h5 {{
+        font-size: var(--t-12) !important;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    [data-testid="stMetricValue"] {
-        font-size: 1.6rem !important;
+        letter-spacing: 0.08em;
+        color: var(--ink-3) !important;
         font-weight: 600 !important;
-        color: #1E293B !important;
-    }
+        margin-bottom: var(--s-2) !important;
+    }}
 
-    /* Clean dividers */
-    hr {
+    /* === Sidebar === */
+    section[data-testid="stSidebar"] {{
+        background-color: var(--surface) !important;
+        border-right: 1px solid var(--line) !important;
+    }}
+    section[data-testid="stSidebar"] .stRadio label {{
+        font-size: var(--t-14);
+        padding: var(--s-2) 0;
+        color: var(--ink-2);
+    }}
+    section[data-testid="stSidebar"] [data-testid="stMetric"] {{
+        background: transparent;
         border: none;
-        border-top: 1px solid #E2E8F0;
-        margin: 1.5rem 0;
-    }
+        padding: var(--s-1) 0;
+    }}
+    section[data-testid="stSidebar"] [data-testid="stMetricValue"] {{
+        font-size: var(--t-18) !important;
+    }}
 
-    /* Button styling */
-    .stButton > button {
-        border-radius: 8px;
+    /* === Tags / pills === */
+    .trend-tag, .company-tag {{
+        font-size: var(--t-12);
+        padding: 2px var(--s-2);
+        border-radius: var(--radius-pill);
         font-weight: 500;
-        font-size: 0.85rem;
-        border: 1px solid #E2E8F0;
-        transition: all 0.15s ease;
-    }
-    .stButton > button:hover {
-        border-color: #4F46E5;
-        color: #4F46E5;
-    }
-    .stButton > button[kind="primary"] {
-        background-color: #4F46E5;
-        border-color: #4F46E5;
-    }
+        display: inline-block;
+        margin-right: var(--s-1);
+        line-height: 1.6;
+    }}
+    .trend-tag {{
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+    }}
+    .company-tag {{
+        background: var(--signal-soft);
+        color: {THEME["signal"]};
+    }}
 
-    /* Expander styling */
-    .streamlit-expanderHeader {
-        font-size: 0.9rem;
+    /* === Score states === */
+    .score-high {{ color: var(--signal); font-weight: 600; }}
+    .score-medium {{ color: var(--warn); font-weight: 600; }}
+    .score-low {{ color: var(--ink-mute); }}
+
+    /* === Metric cards (single-level — no nested cards anti-pattern) === */
+    [data-testid="stMetric"] {{
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: var(--s-4);
+        box-shadow: none !important;
+        transition: border-color 0.15s ease;
+    }}
+    [data-testid="stMetric"]:hover {{ border-color: var(--line-strong); }}
+    [data-testid="stMetricLabel"] {{
+        font-size: var(--t-12) !important;
+        color: var(--ink-3) !important;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 500 !important;
+    }}
+    [data-testid="stMetricValue"] {{
+        font-size: var(--t-28) !important;
+        font-weight: 500 !important;
+        color: var(--ink-1) !important;
+        font-feature-settings: "tnum";
+        letter-spacing: -0.02em;
+    }}
+
+    /* === Hairline dividers === */
+    hr {{
+        border: none;
+        border-top: 1px solid var(--line);
+        margin: var(--s-8) 0;
+    }}
+
+    /* === Buttons === */
+    .stButton > button {{
+        border-radius: var(--radius);
         font-weight: 500;
-        color: #334155;
-    }
+        font-size: var(--t-14);
+        border: 1px solid var(--line);
+        background: var(--paper);
+        color: var(--ink-1);
+        padding: var(--s-2) var(--s-4);
+        transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+        box-shadow: none !important;
+    }}
+    .stButton > button:hover {{
+        border-color: var(--accent);
+        color: var(--accent);
+    }}
+    .stButton > button:focus-visible {{
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }}
+    .stButton > button[kind="primary"] {{
+        background: var(--ink-1);
+        color: var(--paper);
+        border-color: var(--ink-1);
+    }}
+    .stButton > button[kind="primary"]:hover {{
+        background: var(--ink-2);
+        border-color: var(--ink-2);
+        color: var(--paper);
+    }}
+
+    /* === Expanders === */
+    .streamlit-expanderHeader, [data-testid="stExpander"] summary {{
+        font-size: var(--t-14);
+        font-weight: 500;
+        color: var(--ink-2);
+    }}
+    [data-testid="stExpander"] {{
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--paper);
+    }}
+
+    /* === Inputs === */
+    .stTextInput input, .stSelectbox > div > div, .stTextArea textarea,
+    .stNumberInput input {{
+        border-radius: var(--radius-sm) !important;
+        border: 1px solid var(--line) !important;
+        font-size: var(--t-14) !important;
+        background: var(--paper) !important;
+    }}
+    .stTextInput input:focus, .stTextArea textarea:focus,
+    .stNumberInput input:focus {{
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 3px var(--accent-soft) !important;
+    }}
+
+    /* === Tabs === */
+    [data-testid="stTabs"] button {{
+        font-size: var(--t-14);
+        color: var(--ink-3);
+        border-bottom: 2px solid transparent;
+        padding: var(--s-2) var(--s-3);
+        background: transparent;
+    }}
+    [data-testid="stTabs"] button[aria-selected="true"] {{
+        color: var(--ink-1);
+        border-bottom-color: var(--ink-1);
+        font-weight: 500;
+    }}
+
+    /* === DataFrames === */
+    [data-testid="stDataFrame"] {{
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+    }}
+
+    /* === Toast / alert === */
+    [data-testid="stToast"], .stAlert {{
+        border-radius: var(--radius);
+        border: 1px solid var(--line);
+        background: var(--surface);
+    }}
+
+    /* === Anti-AI-slop === */
+    /* No drop shadows, no glows, no purple gradients, no nested cards. */
+    [data-testid="stMetric"], [data-testid="stExpander"],
+    .stButton > button, [data-testid="stToast"], .stAlert {{
+        box-shadow: none !important;
+    }}
+
+    /* Touch targets — min 36px for click areas */
+    .stButton > button {{ min-height: 36px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -201,8 +410,22 @@ def get_articles_df(limit=100, sort_by="relevance"):
 def render_sidebar():
     """Render the sidebar navigation."""
     st.sidebar.markdown(
-        '<p style="font-size:1.1rem;font-weight:600;color:#1E293B;margin-bottom:0;">AI Monitor</p>'
-        '<p style="font-size:0.75rem;color:#94A3B8;margin-top:0;">Deployment Research</p>',
+        f"""
+        <div style="padding: 4px 0 12px 0;">
+          <p style="font-family: 'Fraunces', Georgia, serif;
+                    font-size: 1.25rem; font-weight: 600;
+                    font-variation-settings: 'opsz' 40;
+                    color: {THEME["ink_1"]};
+                    letter-spacing: -0.02em; margin: 0;">
+            Deployment&nbsp;Monitor
+          </p>
+          <p style="font-size: 0.75rem; color: {THEME["ink_3"]};
+                    text-transform: uppercase; letter-spacing: 0.08em;
+                    margin: 4px 0 0 0;">
+            AI&nbsp;Research&nbsp;Briefing
+          </p>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
     st.sidebar.markdown("---")
@@ -243,9 +466,15 @@ def render_sidebar():
 
 def render_dashboard():
     """Render the main dashboard."""
-    st.markdown('<p class="main-header">AI Deployment Research Monitor</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Track the latest trends in AI deployment and enterprise adoption</p>', unsafe_allow_html=True)
-    st.markdown("")
+    st.markdown('<h1 class="main-header">AI Deployment Research</h1>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="sub-header">'
+        'Signals from 30+ AI-focused sources — funding rounds, GA launches, '
+        'customer wins, and deployment-stage transitions. '
+        'Ranked by relevance × freshness, deduplicated across outlets.'
+        '</p>',
+        unsafe_allow_html=True,
+    )
 
     # Top metrics row
     stats = get_database_stats()
@@ -276,17 +505,17 @@ def render_dashboard():
                 y=source_counts.index,
                 orientation="h",
                 labels={"x": "Count", "y": "Source"},
-                color_discrete_sequence=["#6366F1"],
+                color_discrete_sequence=[THEME["accent"]],
             )
             fig.update_layout(
                 height=300,
                 margin=dict(l=0, r=0, t=10, b=0),
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#475569"),
+                font=dict(color=THEME["ink_2"], family="Inter Tight, sans-serif"),
             )
-            fig.update_xaxes(gridcolor="#F1F5F9")
-            fig.update_yaxes(gridcolor="#F1F5F9")
+            fig.update_xaxes(gridcolor=THEME["grid"])
+            fig.update_yaxes(gridcolor=THEME["grid"])
             st.plotly_chart(fig, width="stretch")
         else:
             st.info("No articles yet. Click 'Fetch New Content' to get started.")
@@ -300,14 +529,14 @@ def render_dashboard():
                     values=list(company_counts.values())[:8],
                     names=list(company_counts.keys())[:8],
                     hole=0.45,
-                    color_discrete_sequence=px.colors.qualitative.Pastel,
+                    color_discrete_sequence=THEME_QUALITATIVE,
                 )
                 fig.update_layout(
                     height=300,
                     margin=dict(l=0, r=0, t=10, b=0),
                     plot_bgcolor="rgba(0,0,0,0)",
                     paper_bgcolor="rgba(0,0,0,0)",
-                    font=dict(color="#475569"),
+                    font=dict(color=THEME["ink_2"], family="Inter Tight, sans-serif"),
                 )
                 st.plotly_chart(fig, width="stretch")
             else:
@@ -445,16 +674,16 @@ def render_trends_page():
             x=list(trend_data.keys()),
             y=list(trend_data.values()),
             labels={"x": "Category", "y": "Article Count"},
-            color_discrete_sequence=["#6366F1"],
+            color_discrete_sequence=[THEME["accent"]],
         )
         fig.update_layout(
             height=400,
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#475569"),
+            font=dict(color=THEME["ink_2"], family="Inter Tight, sans-serif"),
         )
-        fig.update_xaxes(gridcolor="#F1F5F9")
-        fig.update_yaxes(gridcolor="#F1F5F9")
+        fig.update_xaxes(gridcolor=THEME["grid"])
+        fig.update_yaxes(gridcolor=THEME["grid"])
         st.plotly_chart(fig, width="stretch")
 
         # Show articles by category
@@ -492,16 +721,16 @@ def render_trends_page():
                 x="date",
                 y="count",
                 labels={"date": "Date", "count": "Articles"},
-                color_discrete_sequence=["#6366F1"],
+                color_discrete_sequence=[THEME["accent"]],
             )
             fig.update_layout(
                 height=300,
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#475569"),
+                font=dict(color=THEME["ink_2"], family="Inter Tight, sans-serif"),
             )
-            fig.update_xaxes(gridcolor="#F1F5F9")
-            fig.update_yaxes(gridcolor="#F1F5F9")
+            fig.update_xaxes(gridcolor=THEME["grid"])
+            fig.update_yaxes(gridcolor=THEME["grid"])
             st.plotly_chart(fig, width="stretch")
 
 
@@ -845,17 +1074,17 @@ def render_reddit_pulse_page():
                 y=["r/" + s for s in sub_counts.index],
                 orientation="h",
                 labels={"x": "Posts", "y": "Subreddit"},
-                color_discrete_sequence=["#818CF8"],
+                color_discrete_sequence=[THEME["accent"]],
             )
             fig.update_layout(
                 height=400,
                 showlegend=False,
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#475569"),
+                font=dict(color=THEME["ink_2"], family="Inter Tight, sans-serif"),
             )
-            fig.update_xaxes(gridcolor="#F1F5F9")
-            fig.update_yaxes(gridcolor="#F1F5F9")
+            fig.update_xaxes(gridcolor=THEME["grid"])
+            fig.update_yaxes(gridcolor=THEME["grid"])
             st.plotly_chart(fig, width="stretch")
 
     with col2:
@@ -891,12 +1120,12 @@ def render_reddit_pulse_page():
             for topic, count in sorted_topics[:8]:
                 bar_width = int(count / max_count * 100)
                 st.markdown(
-                    f'<div style="margin-bottom:8px;">'
-                    f'<div style="font-weight:600;font-size:13px;color:#334155;">{topic}</div>'
-                    f'<div style="background:#E2E8F0;border-radius:4px;height:18px;width:100%;">'
-                    f'<div style="background:#818CF8;border-radius:4px;height:18px;width:{bar_width}%;'
+                    f'<div style="margin-bottom:10px;">'
+                    f'<div style="font-weight:500;font-size:13px;color:{THEME["ink_2"]};margin-bottom:4px;">{topic}</div>'
+                    f'<div style="background:{THEME["surface_2"]};border-radius:4px;height:16px;width:100%;">'
+                    f'<div style="background:{THEME["accent"]};border-radius:4px;height:16px;width:{bar_width}%;'
                     f'display:flex;align-items:center;padding-left:6px;">'
-                    f'<span style="font-size:11px;color:white;font-weight:600;">{count}</span>'
+                    f'<span style="font-size:11px;color:{THEME["paper"]};font-weight:500;font-feature-settings:\'tnum\';">{count}</span>'
                     f'</div></div></div>',
                     unsafe_allow_html=True,
                 )
@@ -956,7 +1185,7 @@ def render_reddit_pulse_page():
             height=300,
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#475569"),
+            font=dict(color=THEME["ink_2"], family="Inter Tight, sans-serif"),
         )
         st.plotly_chart(fig, width="stretch")
 
@@ -1039,7 +1268,7 @@ def render_reddit_pulse_page():
                         color="subreddit",
                         markers=True,
                         labels={"date_str": "Date", "count": "Posts", "subreddit": "Subreddit"},
-                        color_discrete_sequence=px.colors.qualitative.Pastel,
+                        color_discrete_sequence=THEME_QUALITATIVE,
                     )
                     fig.update_layout(
                         height=300,
@@ -1048,10 +1277,10 @@ def render_reddit_pulse_page():
                         xaxis=dict(tickangle=45),
                         plot_bgcolor="rgba(0,0,0,0)",
                         paper_bgcolor="rgba(0,0,0,0)",
-                        font=dict(color="#475569"),
+                        font=dict(color=THEME["ink_2"], family="Inter Tight, sans-serif"),
                     )
-                    fig.update_xaxes(gridcolor="#F1F5F9")
-                    fig.update_yaxes(gridcolor="#F1F5F9")
+                    fig.update_xaxes(gridcolor=THEME["grid"])
+                    fig.update_yaxes(gridcolor=THEME["grid"])
                     st.plotly_chart(fig, width="stretch")
                 else:
                     st.info("Not enough data across multiple days to show trends.")
@@ -1320,17 +1549,17 @@ def render_opportunities_page():
                 y=list(display_types.keys()),
                 orientation="h",
                 labels={"x": "Count", "y": "Signal Type"},
-                color_discrete_sequence=["#6366F1"],
+                color_discrete_sequence=[THEME["accent"]],
             )
             fig.update_layout(
                 height=300,
                 margin=dict(l=0, r=0, t=10, b=0),
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#475569"),
+                font=dict(color=THEME["ink_2"], family="Inter Tight, sans-serif"),
             )
-            fig.update_xaxes(gridcolor="#F1F5F9")
-            fig.update_yaxes(gridcolor="#F1F5F9")
+            fig.update_xaxes(gridcolor=THEME["grid"])
+            fig.update_yaxes(gridcolor=THEME["grid"])
             st.plotly_chart(fig, width="stretch")
         else:
             st.info("No opportunity signals yet. Run 'Analyze Articles' to detect them.")
@@ -1343,14 +1572,14 @@ def render_opportunities_page():
                 values=list(verticals.values()),
                 names=list(verticals.keys()),
                 hole=0.45,
-                color_discrete_sequence=px.colors.qualitative.Pastel,
+                color_discrete_sequence=THEME_QUALITATIVE,
             )
             fig.update_layout(
                 height=300,
                 margin=dict(l=0, r=0, t=10, b=0),
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color="#475569"),
+                font=dict(color=THEME["ink_2"], family="Inter Tight, sans-serif"),
             )
             st.plotly_chart(fig, width="stretch")
         else:
@@ -1398,13 +1627,29 @@ def render_opportunities_page():
             with st.container():
                 col1, col2 = st.columns([0.85, 0.15])
                 with col1:
-                    badge_html = f'<span style="background:{badge_color};color:white;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:600;">{display_type}</span>'
+                    pill = (
+                        f"padding:2px 10px;border-radius:999px;"
+                        f"font-size:0.7rem;letter-spacing:0.02em;"
+                    )
+                    badge_html = (
+                        f'<span style="background:{badge_color};color:{THEME["paper"]};'
+                        f'font-weight:600;{pill}">{display_type}</span>'
+                    )
                     if company:
-                        badge_html += f' <span style="background:#F1F5F9;color:#334155;padding:2px 8px;border-radius:4px;font-size:0.7rem;">{company}</span>'
+                        badge_html += (
+                            f' <span style="background:{THEME["surface_2"]};color:{THEME["ink_2"]};{pill}">'
+                            f'{company}</span>'
+                        )
                     if vertical:
-                        badge_html += f' <span style="background:#FFF7ED;color:#C2410C;padding:2px 8px;border-radius:4px;font-size:0.7rem;">{vertical}</span>'
+                        badge_html += (
+                            f' <span style="background:{THEME["signal_soft"]};color:{THEME["signal"]};{pill}">'
+                            f'{vertical}</span>'
+                        )
                     if stage:
-                        badge_html += f' <span style="background:#EEF2FF;color:#4338CA;padding:2px 8px;border-radius:4px;font-size:0.7rem;">{stage}</span>'
+                        badge_html += (
+                            f' <span style="background:{THEME["accent_soft"]};color:{THEME["accent_ink"]};{pill}">'
+                            f'{stage}</span>'
+                        )
                     st.markdown(badge_html, unsafe_allow_html=True)
                     st.markdown(f"**[{title}]({url})**")
                     if summary:
