@@ -167,7 +167,7 @@ EMAIL_TEMPLATE = """\
   </div>
   <div class="footer">
     <p>You're receiving this because you subscribed to AI Deployment Monitor newsletters.</p>
-    <p>Powered by <a href="https://github.com/kalyvask/newsletter">AI Deployment Monitor</a></p>
+    <p>Powered by AI Deployment Monitor</p>
   </div>
 </div>
 </body>

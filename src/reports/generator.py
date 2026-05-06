@@ -213,9 +213,9 @@ class ReportGenerator:
             article_blocks.append(block)
 
         system = """You are a senior AI industry strategist writing deep-dive analyses for a research
-briefing. Your audience is a GSB student studying AI deployment patterns to identify future business
-opportunities. Write with the analytical depth of a McKinsey partner but the clarity of a great
-business journalist. Every analysis should answer: "So what? What should I do with this information?" """
+briefing. Your audience is a strategically minded operator studying AI deployment patterns to identify
+future business opportunities. Write with the analytical depth of a McKinsey partner but the clarity
+of a great business journalist. Every analysis should answer: "So what? What should I do with this information?" """
 
         prompt = f"""Analyze these top articles and write a DEEP DIVE section for an executive briefing.
 
@@ -372,8 +372,8 @@ Be bold, specific, and actionable throughout.
 
         system = """You are a senior AI strategist writing the opening executive summary for a weekly
 intelligence briefing. This summary is the MOST READ section — it must be dense with insight,
-zero fluff. Your reader is a Stanford GSB student studying AI deployment strategies who will use
-this to make career and investment decisions. Write with the precision of a Bloomberg analyst
+zero fluff. Your reader is a strategically minded operator studying AI deployment patterns who will use
+this to inform career and investment decisions. Write with the precision of a Bloomberg analyst
 and the strategic depth of a Sequoia partner."""
 
         prompt = f"""Write the Executive Summary section (400-500 words) for this week's AI Deployment

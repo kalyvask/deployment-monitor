@@ -772,7 +772,7 @@ def _generate_reddit_ai_synthesis(reddit_df, top_posts_data, subreddit_stats):
         sub_overview.append(f"r/{sub}: {count} posts")
 
     system = """You are a senior AI industry analyst writing the community intelligence section of a
-weekly briefing for a Stanford GSB student studying AI deployment strategies. Your job is to decode
+weekly briefing for a strategically minded reader studying AI deployment patterns. Your job is to decode
 what real practitioners are saying on Reddit and translate it into strategic signals. Focus on what
 the COMMUNITY'S behavior tells us about where AI deployment is headed — not just what the articles say."""
 

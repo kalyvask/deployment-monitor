@@ -57,3 +57,7 @@ logs/
 # Misc
 nul
 *.pdf
+
+# Local scheduled-task wrappers (copy from .example, then customize)
+run_newsletter.bat
+newsletter_log.txt

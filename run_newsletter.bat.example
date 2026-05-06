@@ -1,0 +1,21 @@
+@echo off
+REM Weekly AI Deployment Newsletter - Scheduled Task (Windows Task Scheduler)
+REM Runs: scrape all sources -> analyze with Claude -> generate report -> send email
+REM
+REM Setup:
+REM   1. Copy this file to run_newsletter.bat (it is gitignored).
+REM   2. Edit the path below to point to your local clone.
+REM   3. Edit the recipient email to your own address.
+REM   4. Schedule via Windows Task Scheduler.
+
+cd /d "C:\path\to\your\clone\ai-deployment-monitor"
+
+REM Set UTF-8 encoding for Rich console output
+chcp 65001 >nul 2>&1
+set PYTHONIOENCODING=utf-8
+
+REM Run the full newsletter pipeline
+python main.py newsletter --type executive --to your_email@example.com
+
+REM Log completion
+echo [%date% %time%] Newsletter pipeline completed >> newsletter_log.txt

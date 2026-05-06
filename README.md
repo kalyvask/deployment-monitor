@@ -235,6 +235,15 @@ The tool focuses on cutting-edge 2025 AI trends:
 - Startups: Harvey, Glean, Cursor, Perplexity, Cognition
 - And many more...
 
+## Configure for Your Own Use
+
+After cloning, plug in your own setup:
+
+- **API keys & email**: copy `.env.example` to `.env` and fill in `ANTHROPIC_API_KEY`, optional `REDDIT_*` credentials, and `SMTP_*` / `REPORT_EMAIL_TO` for the newsletter.
+- **Tracked sources, subreddits, keywords, and target companies**: edit `src/config.py`. The defaults are a sensible starting set — replace them with your own focus areas.
+- **Scheduled newsletter (Windows)**: copy `run_newsletter.bat.example` to `run_newsletter.bat`, set the path to your clone and your recipient email, then point Windows Task Scheduler at it. The local copy is gitignored.
+- **Scheduled run (cross-platform)**: use `python main.py daemon --interval 4h` instead, or wire the same `python main.py newsletter ...` command into cron / launchd.
+
 ## Cost Management
 
 The tool uses Claude API for content analysis. To manage costs:
