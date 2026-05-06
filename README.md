@@ -2,6 +2,39 @@
 
 A Python-based research monitoring tool that automatically scans multiple sources (news sites, Reddit, Hacker News, blogs, RSS feeds) for content relevant to AI deployment strategies, implementation models, and the latest AI trends.
 
+## Personalize this for your own use
+
+This repo ships with the maintainer's curated keywords, sources, and target companies. If you forked or cloned it, do these steps in order before running anything — otherwise you will be researching someone else's interests.
+
+1. **Copy the env file:** `cp .env.example .env`. The `.env` file is gitignored — your secrets stay local.
+2. **Set your Anthropic API key in `.env`:** `ANTHROPIC_API_KEY=sk-ant-...` Get one at [console.anthropic.com](https://console.anthropic.com). Required for AI analysis.
+3. **Set email delivery in `.env`** so the newsletter can reach you. Edit these vars:
+   - `SMTP_HOST` (default `smtp.gmail.com`)
+   - `SMTP_PORT` (default `587`)
+   - `SMTP_USER=your_email@gmail.com`
+   - `SMTP_PASSWORD=your_app_password` — for Gmail, generate an App Password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+   - `REPORT_EMAIL_TO=where_the_newsletter_goes@example.com`
+   - `REPORT_EMAIL_FROM=` (optional; defaults to `SMTP_USER`)
+4. **(Optional) Set Reddit credentials in `.env`** if you want Reddit scraping: `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`. Create an app at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps). Without these, Reddit is skipped — HN and RSS still work.
+5. **Edit `src/config.py` to swap in your own focus areas.** The defaults are tuned for AI deployment / observability research. Replace these lists with what you actually care about:
+   - `PRIMARY_KEYWORDS` and `SECONDARY_KEYWORDS` — the terms the relevance scorer matches on (primary = higher weight)
+   - `EXCLUSION_KEYWORDS` — terms that filter articles out (e.g. crypto, web3)
+   - `REDDIT_SUBREDDITS` — list of subreddit names (no `r/` prefix)
+   - `RSS_FEEDS` — dict of `{name: url}` for blogs and news
+   - `TARGET_COMPANIES`, `COMPANY_TIER_A`, `COMPANY_TIER_B`, `COMPANY_TIER_C` — companies to flag and weight in scoring
+   - `INDUSTRY_VERTICALS` — sector-classification keyword groups
+   - `TREND_CATEGORIES` — the trend buckets shown in the UI
+6. **Set up the scheduled newsletter (Windows):** `cp run_newsletter.bat.example run_newsletter.bat`, then edit two lines inside it:
+   - `cd /d "C:\path\to\your\clone\ai-deployment-monitor"` — point to your local clone
+   - `python main.py newsletter --type executive --to your_email@example.com` — set your recipient
+
+   Then point Windows Task Scheduler at `run_newsletter.bat`. The `.bat` file (and `newsletter_log.txt`) are gitignored.
+
+   **Cross-platform alternative:** skip the `.bat` and run `python main.py daemon --interval 4h`, or wire `python main.py newsletter ...` into cron / launchd.
+7. **Initialize and verify:** `python main.py init` then `python main.py run` to confirm the pipeline works end-to-end.
+
+**What stays local (gitignored, never pushed):** `.env`, `data/research.db` (your scraped articles), `output/reports/*.md` (generated reports), `drafts/`, `run_newsletter.bat`, `newsletter_log.txt`, and any `*.log` files.
+
 ## Features
 
 - **Web UI Dashboard**: Interactive Streamlit interface for browsing and analyzing content
@@ -234,15 +267,6 @@ The tool focuses on cutting-edge 2025 AI trends:
 - Infrastructure: Databricks, Scale AI, Modal, Replicate, Groq
 - Startups: Harvey, Glean, Cursor, Perplexity, Cognition
 - And many more...
-
-## Configure for Your Own Use
-
-After cloning, plug in your own setup:
-
-- **API keys & email**: copy `.env.example` to `.env` and fill in `ANTHROPIC_API_KEY`, optional `REDDIT_*` credentials, and `SMTP_*` / `REPORT_EMAIL_TO` for the newsletter.
-- **Tracked sources, subreddits, keywords, and target companies**: edit `src/config.py`. The defaults are a sensible starting set — replace them with your own focus areas.
-- **Scheduled newsletter (Windows)**: copy `run_newsletter.bat.example` to `run_newsletter.bat`, set the path to your clone and your recipient email, then point Windows Task Scheduler at it. The local copy is gitignored.
-- **Scheduled run (cross-platform)**: use `python main.py daemon --interval 4h` instead, or wire the same `python main.py newsletter ...` command into cron / launchd.
 
 ## Cost Management
 
